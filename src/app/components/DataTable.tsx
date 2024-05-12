@@ -8,13 +8,11 @@ import {
   GridActionsCellItem,
   GridColDef,
 } from '@mui/x-data-grid';
-import { useDemoData } from '@mui/x-data-grid-generator';
 import Button from '@mui/material/Button';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RestoreIcon from '@mui/icons-material/Restore';
 import LoadingButton from '@mui/lab/LoadingButton';
 import SaveIcon from '@mui/icons-material/Save';
-import { darken } from '@mui/material/styles';
 
 export default function BulkEditingNoSnap() {
   const placeholderColumns: GridColDef[] = [
@@ -95,7 +93,7 @@ export default function BulkEditingNoSnap() {
               icon={<DeleteIcon />}
               label="Delete"
               onClick={() => {
-                unsavedChangesRef.current.rowsBeforeChange[id] = {
+                unsavedChangesRef.current.unsavedRows[id] = {
                   ...row,
                   _action: 'delete',
                 };
