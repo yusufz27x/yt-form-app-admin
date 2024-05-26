@@ -13,6 +13,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import RestoreIcon from '@mui/icons-material/Restore';
 import LoadingButton from '@mui/lab/LoadingButton';
 import SaveIcon from '@mui/icons-material/Save';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
 
 export default function BulkEditingNoSnap() {
   const placeholderColumns: GridColDef[] = [
@@ -64,13 +69,15 @@ export default function BulkEditingNoSnap() {
     rowsBeforeChange: {},
   });
   const [isSaving, setIsSaving] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+  const [rowToDelete, setRowToDelete] = React.useState<GridRowId | null>(null);
 
   const columns = React.useMemo<GridColDef[]>(() => {
     return [
       {
         field: 'actions',
         headerName: 'Actions',
-        renderCell: ({ id,row }) => {
+        renderCell: ({ id, row }) => {
           return [
             <GridActionsCellItem
               key={`restore-${id}`}
@@ -92,19 +99,9 @@ export default function BulkEditingNoSnap() {
               key={`delete-${id}`}
               icon={<DeleteIcon />}
               label="Delete"
-              onClick={() => {
-                unsavedChangesRef.current.unsavedRows[id] = {
-                  ...row,
-                  _action: 'delete',
-                };
-                if (!unsavedChangesRef.current.rowsBeforeChange[id]) {
-                  unsavedChangesRef.current.rowsBeforeChange[id] = row;
-                }
-                handleDeleteRow(id);
-                apiRef.current.updateRows([row]); // to trigger row render
-              }}
+              onClick={() => handleOpenDialog(id, row)}
             />,
-            ];
+          ];
         },
       },
       ...placeholderColumns,
@@ -135,9 +132,9 @@ export default function BulkEditingNoSnap() {
 
   const discardChanges = () => {
     setHasUnsavedRows(false);
-    apiRef.current.updateRows(
-      Object.values(unsavedChangesRef.current.rowsBeforeChange),
-    );
+    const rowsToUpdate = Object.values(unsavedChangesRef.current.rowsBeforeChange)
+      .filter(row => unsavedChangesRef.current.unsavedRows[row.id]?._action !== 'delete');
+    apiRef.current.updateRows(rowsToUpdate);
     unsavedChangesRef.current = {
       unsavedRows: {},
       rowsBeforeChange: {},
@@ -170,6 +167,35 @@ export default function BulkEditingNoSnap() {
     }
   };
 
+  const handleOpenDialog = (id: GridRowId, row: GridValidRowModel) => {
+    setRowToDelete(id);
+    setOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpen(false);
+    setRowToDelete(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (rowToDelete !== null) {
+      const row = apiRef.current.getRow(rowToDelete);
+      if (row) {
+        unsavedChangesRef.current.unsavedRows[rowToDelete] = {
+          ...row,
+          _action: 'delete',
+        };
+        if (!unsavedChangesRef.current.rowsBeforeChange[rowToDelete]) {
+          unsavedChangesRef.current.rowsBeforeChange[rowToDelete] = row;
+        }
+        handleDeleteRow(rowToDelete);
+        apiRef.current.updateRows([row]); // to trigger row render
+      }
+    }
+    setOpen(false);
+    setRowToDelete(null);
+  };
+
   return (
     <div style={{ width: '100%' }}>
       <div style={{ marginBottom: 8 }}>
@@ -192,7 +218,7 @@ export default function BulkEditingNoSnap() {
       </div>
       <div style={{ height: 400 }}>
         <DataGrid
-          rows = {placeholderRows}
+          rows={placeholderRows}
           columns={columns}
           apiRef={apiRef}
           disableRowSelectionOnClick
@@ -212,6 +238,25 @@ export default function BulkEditingNoSnap() {
           }}
         />
       </div>
+      <Dialog
+        open={open}
+        onClose={handleCloseDialog}
+      >
+        <DialogTitle>{"Are you sure you want to delete this item?"}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Deleting this item will remove it permanently. Do you want to proceed?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmDelete} color="secondary">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
